@@ -1,49 +1,198 @@
 <!doctype html>
 <html>
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title>reveal.js</title>
+    <title>Tips for Python Web Scraping - Ben Denham</title>
 
-		<link rel="stylesheet" href="css/reveal.css">
-		<link rel="stylesheet" href="css/theme/black.css">
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/black.css">
 
-		<!-- Theme used for syntax highlighting of code -->
-		<link rel="stylesheet" href="lib/css/zenburn.css">
+    <!-- Theme used for syntax highlighting of code -->
+    <link rel="stylesheet" href="lib/css/zenburn.css">
 
-		<!-- Printing and PDF exports -->
-		<script>
-			var link = document.createElement( 'link' );
-			link.rel = 'stylesheet';
-			link.type = 'text/css';
-			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
-			document.getElementsByTagName( 'head' )[0].appendChild( link );
-		</script>
-	</head>
-	<body>
-		<div class="reveal">
-			<div class="slides">
-				<section>Slide 1</section>
-				<section>Slide 2</section>
-			</div>
-		</div>
+    <!-- Printing and PDF exports -->
+    <script>
+     var link = document.createElement( 'link' );
+     link.rel = 'stylesheet';
+     link.type = 'text/css';
+     link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+     document.getElementsByTagName( 'head' )[0].appendChild( link );
+    </script>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section>
 
-		<script src="lib/js/head.min.js"></script>
-		<script src="js/reveal.js"></script>
+          <h1>Tips for Python Web Scraping</h1>
 
-		<script>
-			// More info about config & dependencies:
-			// - https://github.com/hakimel/reveal.js#configuration
-			// - https://github.com/hakimel/reveal.js#dependencies
-			Reveal.initialize({
-				dependencies: [
-					{ src: 'plugin/markdown/marked.js' },
-					{ src: 'plugin/markdown/markdown.js' },
-					{ src: 'plugin/notes/notes.js', async: true },
-					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
-				]
-			});
-		</script>
-	</body>
+          <h3>Ben Denham - Catalyst</h3>
+
+        </section>
+        <section>
+
+          <h2>Motivation</h2>
+
+          <ul>
+            <li>Needed to collect data about ~13,000 PHP modules for the Drupal CMS</li>
+            <li class="fragment">Each required scraping several webpages and a source-code tarball</li>
+            <li class="fragment">Scraping took ~60 hours</li>
+          </ul>
+
+        </section>
+
+        <section>
+
+          <h2>1. BeatifulSoup</h2>
+
+          <pre><code data-trim>
+from bs4 import BeautifulSoup
+
+html = '<p id="intro">An introduction</p>'
+soup = BeautifulSoup(html, 'html.parser')
+
+soup.p.string # => 'An introduction'
+soup.p['id'] # => 'intro'
+          </code></pre>
+
+          <p>Also see the Scrapy framework</p>
+
+        </section>
+
+        <section>
+
+          <h2>2. Async</h2>
+
+          <pre><code data-trim>
+results = []
+for page in pages:
+    results.append(scrape(page))
+          </code></pre>
+
+          <p>becomes</p>
+
+          <pre><code data-trim>
+from concurrent import futures
+with futures.ThreadPoolExecutor() as executor:
+    results = executor.map(scrape, pages)
+          </code></pre>
+
+          <ul>
+            <li class="fragment">Watch "Practical Python Async for Dummies"</li>
+            <li class="fragment">Check for rate limits...</li>
+          </ul>
+
+        </section>
+
+        <section>
+
+          <h2>3. Make it restartable</h2>
+
+          <ul>
+            <li>You'll want to:
+              <ul>
+                <li>Scrape 10 records, fix bugs</li>
+                <li>Scrape 100 records, fix bugs</li>
+                <li>Scrape 1000 records, fix bugs</li>
+                <li>etc...</li>
+              </ul>
+            </li>
+            <li class="fragment">Redirecting to a CSV wont' cut it</li>
+          </ul>
+
+        </section>
+
+        <section>
+
+          <h2>3. Make it restartable: sqlite3</h2>
+
+          <pre><code data-trim>
+import sqlite3
+conn = sqlite3.connect('files/results.db')
+c = conn.cursor()
+# Insert data
+c.execute('create table if not exists ...')
+c.execute('insert ...')
+conn.commit()
+# Fetch data
+c.execute('select ...')
+results = c.fetchall()
+          </code></pre>
+
+          <p>Makes searching, aggregating, and deleting subsets easy.</p>
+
+        </section>
+
+        <section>
+
+          <h2>4. Log everything</h2>
+
+          <ul>
+            <li class="fragment">"Try/Except" all exceptions, but log them!</li>
+            <li class="fragment">If a value can't be scraped, why?</li>
+          </ul>
+
+          <div class="fragment">
+            <p>Flush output if you want live results:</p>
+
+            <pre><code data-trim>
+./scraper.py | tee message-log.txt
+            </code></pre>
+
+            <pre><code data-trim>
+import sys
+for page in pages:
+    scrape(page)
+    print('Scraped: {}'.format(page))
+    sys.stdout.flush()
+            </code></pre>
+
+          </div>
+
+        </section>
+
+        <section>
+
+          <h2>5. Update yourself with Slack</h2>
+
+          <pre><code data-trim>
+from slackclient import SlackClient
+slack = SlackClient('xxxxx-xxxxx-xxxxx-xxxxx')
+slack.api_call('chat.postMessage',
+               channel='#general',
+               text='Hello World!',
+               username='My Web Scraper',
+               icon_emoji=':robot_face')
+          </code></pre>
+
+        </section>
+
+        <section>
+
+          <h1>Happy Scraping!</h1>
+
+        </section>
+
+      </div>
+    </div>
+
+    <script src="lib/js/head.min.js"></script>
+    <script src="js/reveal.js"></script>
+
+    <script>
+     // More info about config & dependencies:
+     // - https://github.com/hakimel/reveal.js#configuration
+     // - https://github.com/hakimel/reveal.js#dependencies
+     Reveal.initialize({
+       dependencies: [
+         { src: 'plugin/markdown/marked.js' },
+         { src: 'plugin/markdown/markdown.js' },
+         { src: 'plugin/notes/notes.js', async: true },
+         { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+       ]
+     });
+    </script>
+  </body>
 </html>
